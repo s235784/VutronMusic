@@ -936,22 +936,41 @@ export const usePlayerStore = defineStore(
       audio.load()
     }
 
+    let pauseTimeout: ReturnType<typeof setTimeout> | null = null
+
     const play = () => {
+      if (pauseTimeout) {
+        clearTimeout(pauseTimeout)
+        pauseTimeout = null
+      }
+
       const arts = currentTrack.value?.artists ?? currentTrack.value?.ar
       audioContext.resume().then(() => {
         audio.play()
+        howler.masterGain.gain.linearRampToValueAtTime(volume.value, audioContext.currentTime + 0.2)
         title.value = `${currentTrack.value?.name} · ${arts[0].name} - VutronMusic`
         document.title = title.value
-        howler.masterGain.gain.linearRampToValueAtTime(volume.value, audioContext.currentTime + 0.2)
       })
     }
 
     const pause = async () => {
-      howler.masterGain.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.2)
-      audio.pause()
+      if (pauseTimeout) {
+        clearTimeout(pauseTimeout)
+        pauseTimeout = null
+      }
+
+      const now = audioContext.currentTime
+      howler.masterGain.gain.cancelScheduledValues(now)
+      howler.masterGain.gain.setValueAtTime(volume.value, now)
+      howler.masterGain.gain.linearRampToValueAtTime(0, now + 0.2)
+
+      pauseTimeout = setTimeout(() => {
+        audio.pause()
+        // await audioContext.suspend()
+      }, 150)
+
       title.value = 'VutronMusic'
       document.title = title.value
-      await audioContext.suspend()
     }
 
     const playOrPause = async () => {
