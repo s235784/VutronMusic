@@ -770,8 +770,12 @@ export const usePlayerStore = defineStore(
           return data ?? null
         })
         .then((track) => {
+          // 仅在必要时替换track，避免丢失MediaSession
+          if (!track) return false
+          else if (currentTrack.value?.id === track.id) return false
+
           currentTrack.value = track
-          return getTrackSource(track!).then((source) => {
+          return getTrackSource(track).then((source) => {
             let replaced = false
             if (source) {
               if (track!.id === currentTrack.value?.id) {
@@ -1071,7 +1075,7 @@ export const usePlayerStore = defineStore(
     }
 
     const updateMediaSessionMetaData = async (track: Track) => {
-      if ('mediaSession' in navigator === false) return
+      if (!('mediaSession' in navigator)) return
       const arts = track.artists ?? track.ar
       const artists = arts.map((a) => a.name)
       const metadata = {
@@ -1094,14 +1098,20 @@ export const usePlayerStore = defineStore(
         trackId: track.id,
         url: '/trackid/' + track.id
       }
-      navigator.mediaSession.metadata = null
       navigator.mediaSession.metadata = new MediaMetadata(metadata)
+      navigator.mediaSession.playbackState = playing.value ? 'playing' : 'paused'
+      navigator.mediaSession.setPositionState({
+        duration: currentTrackDuration.value,
+        playbackRate: 1.0,
+        position: seek.value
+      })
       if (window.env?.isLinux) {
         metadata.artwork.map((art) => {
           art.src = (currentTrack.value?.album?.picUrl || currentTrack.value?.al?.picUrl)!
         })
         window.mainApi?.send('metadata', metadata)
       }
+      console.log(`metadata: ${JSON.stringify(metadata)}`)
     }
 
     const resetPlayer = (resetBiq = true) => {
@@ -1198,8 +1208,20 @@ export const usePlayerStore = defineStore(
         }
       )
 
-      window.mainApi?.on('resume', () => {
+      window.mainApi?.on('suspend', async () => {
+        await audioContext.suspend()
+        console.log('On Suspend')
+      })
+
+      window.mainApi?.on('resume', async () => {
+        console.log('resume')
         if (!currentTrack.value) return
+
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume()
+          console.log('AudioContext resumed')
+        }
+
         const t = _progress.value
         replaceCurrentTrack(currentTrack.value.id, false).then((res) => {
           if (res) seek.value = t

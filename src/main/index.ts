@@ -743,6 +743,10 @@ class BackGround {
       this.fastifyApp?.close()
     })
 
+    powerMonitor.on('suspend', () => {
+      this.win.webContents.send('suspend')
+    })
+
     powerMonitor.on('resume', () => {
       setTimeout(() => this.initMessageChannel(), 1000)
       this.win.webContents.send('resume')

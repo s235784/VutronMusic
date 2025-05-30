@@ -64,6 +64,7 @@ const rendererAvailChannels: string[] = [
   'rememberCloseAppOption',
   'msgDeletedTracks',
   'msgExtensionCheckResult',
+  'suspend',
   'resume',
   'update-not-available',
   'update-error',
